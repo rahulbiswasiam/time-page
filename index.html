@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Digital Clock</title>
+    <style>
+        /* Import a clean, modern font from Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap');
+
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-primary: #ffffff;
+            
+            /* Dynamic Accent System */
+            --accent-rgb: 0, 255, 136; /* Default Green */
+            --text-secondary: rgb(var(--accent-rgb));
+            
+            --shadow-light: rgba(255, 255, 255, 0.05);
+            --shadow-dark: rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer; /* Indicate the whole screen is interactive */
+            transition: background-color 0.5s ease;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        .clock-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Provide a backdrop for the circle, optional but good for contrast */
+            width: 400px;
+            height: 400px; 
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--card-bg) 40%, transparent 70%);
+            box-shadow: 0 0 80px rgba(0,0,0,0.3);
+        }
+
+        /* SVG Ring Styling */
+        .ring-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg); /* Start from top */
+            filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.6));
+            transition: filter 0.3s ease;
+        }
+
+        .ring-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 8;
+        }
+
+        .ring-progress {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 8;
+            stroke-linecap: round;
+            /* Transition for the fill animation */
+            transition: stroke-dashoffset 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+        }
+
+        /* Clock specific wrapper for the toggle click */
+        .clock-content {
+            z-index: 2;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .clock-content:active {
+            transform: scale(0.98);
+        }
+
+        .time-wrapper {
+            position: relative;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+        }
+
+        .time {
+            font-size: 4.5rem;
+            font-weight: 500;
+            letter-spacing: -2px;
+            text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.3);
+            transition: text-shadow 0.3s ease;
+            line-height: 1;
+        }
+
+        .seconds {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            opacity: 0.9;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .ampm {
+            font-size: 1rem;
+            color: #666;
+            margin-top: 5px;
+            height: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .date {
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+
+        .instruction-hint {
+            position: fixed;
+            bottom: 20px;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.2);
+            pointer-events: none;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 600px) {
+            .clock-container {
+                width: 320px;
+                height: 320px;
+            }
+            .time {
+                font-size: 3rem;
+            }
+            .seconds {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="clock-container" id="clock-container">
+        <!-- SVG Radial Timer -->
+        <svg class="ring-svg" viewBox="0 0 200 200">
+            <!-- Background Track -->
+            <circle class="ring-track" cx="100" cy="100" r="90"></circle>
+            <!-- Progress Fill -->
+            <circle class="ring-progress" cx="100" cy="100" r="90"></circle>
+        </svg>
+
+        <!-- Content inside the ring -->
+        <div class="clock-content" id="clock-display">
+            <div class="time-wrapper">
+                <span id="time" class="time">00:00</span>
+                <span id="seconds" class="seconds">00</span>
+            </div>
+            <div id="ampm" class="ampm"></div>
+            <div id="date" class="date">Loading...</div>
+        </div>
+    </div>
+
+    <div class="instruction-hint">Made by Rahul 👻</div>
+
+    <script>
+        // --- Configuration ---
+        const themes = [
+            { name: 'Neon Green', rgb: '0, 255, 136' },
+            { name: 'Cyber Blue', rgb: '0, 240, 255' },
+            { name: 'Neon Purple', rgb: '180, 0, 255' },
+            { name: 'Hot Pink',   rgb: '255, 0, 85' },
+            { name: 'Amber',      rgb: '255, 170, 0' }
+        ];
+
+        // --- State ---
+        let is24Hour = true;
+        let currentThemeIndex = 0;
+        
+        // --- Ring Logic Setup ---
+        const ring = document.querySelector('.ring-progress');
+        // r=90, so circumference = 2 * PI * 90
+        const radius = 90;
+        const circumference = 2 * Math.PI * radius;
+        
+        // Initialize Stroke Config
+        ring.style.strokeDasharray = `${circumference} ${circumference}`;
+        ring.style.strokeDashoffset = circumference;
+
+        // --- Clock Logic ---
+        function updateClock() {
+            const now = new Date();
+
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = now.getSeconds(); // Number for calc
+            const secondsStr = String(seconds).padStart(2, '0'); // String for display
+            let ampmStr = '';
+
+            if (!is24Hour) {
+                ampmStr = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12;
+            }
+           
+            const hoursStr = String(hours).padStart(2, '0');
+
+            // Update Text
+            document.getElementById('time').textContent = `${hoursStr}:${minutes}`;
+            document.getElementById('seconds').textContent = secondsStr;
+            document.getElementById('ampm').textContent = is24Hour ? '' : ampmStr;
+
+            const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('date').textContent = now.toLocaleDateString(undefined, options);
+
+            // Update Ring Progress
+            const offset = circumference - (seconds / 60) * circumference;
+            
+            // Handle the 59->0 transition smoothly (disable transition momentarily if needed, 
+            // but standard behavior usually looks fine or we can clamp). 
+            // For a simple smooth tick, we just set the offset.
+            if (seconds === 0) {
+                // Remove transition to snap back instantly to top without unwinding
+                ring.style.transition = 'none';
+                ring.style.strokeDashoffset = circumference;
+                // Force layout reflow
+                void ring.offsetWidth; 
+                // Restore transition for the next tick (0 -> 1)
+                // We perform this async slightly to ensure the visual snap happened
+                setTimeout(() => {
+                    ring.style.transition = 'stroke-dashoffset 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease';
+                }, 10);
+            } else {
+                ring.style.strokeDashoffset = offset;
+            }
+        }
+
+        // --- Interaction Logic ---
+
+        // 1. Toggle Time Format (Specific to clock area)
+        document.getElementById('clock-display').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent the background click from firing
+            is24Hour = !is24Hour;
+            updateClock();
+        });
+
+        // 2. Cycle Theme (Global click)
+        document.addEventListener('click', () => {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+            const newTheme = themes[currentThemeIndex];
+            
+            // Update CSS Variable
+            document.documentElement.style.setProperty('--accent-rgb', newTheme.rgb);
+        });
+
+        // Initialize
+        updateClock();
+        setInterval(updateClock, 1000);
+    </script>
+</body>
+</html>
